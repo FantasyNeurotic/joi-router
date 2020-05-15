@@ -42,7 +42,7 @@ function Router() {
 delegate(Router.prototype, 'router')
   .method('prefix')
   .method('use')
-  .method('param');
+  .method('param');        
 
 /**
  * Return koa middleware
@@ -130,7 +130,6 @@ Router.prototype._addRoute = function addRoute(spec) {
   ], handlers);
 
   const router = this.router;
-
   spec.method.forEach((method) => {
     router[method].apply(router, args);
   });
@@ -388,11 +387,12 @@ function makeMultipartParser(spec) {
 function makeBodyParser(spec) {
   if (!(spec.validate && spec.validate.type)) return noopMiddleware;
   let type = spec.validate.type
+  
   if (typeof type === 'string') {
     type = [type]
   }
-  type = spec.validate.type.find(type => {
-    switch (type) {
+  for(let item of type) {
+    switch (item) {
       case 'json':
         return wrapError(spec, makeJSONBodyParser(spec));
       case 'form':
@@ -403,7 +403,7 @@ function makeBodyParser(spec) {
       default:
         throw new Error(`unsupported body type: ${spec.validate.type}`);
     }
-  })
+  }
 }
 
 /**
@@ -499,7 +499,8 @@ function validateInput(prop, ctx, validate) {
   debug('validating %s', prop);
 
   const request = ctx.request;
-  const res = Joi.validate(request[prop], validate[prop], (validate.validateOptions || {}));
+  const schema = Joi.compile(validate[prop]);
+  const res = schema.validate(request[prop], validate.validateOptions || {})
 
   if (res.error) {
     res.error.status = validate.failure;
