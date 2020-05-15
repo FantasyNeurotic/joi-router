@@ -28,6 +28,9 @@
     "type": "git",
     "url": "https://github.com/koajs/joi-router.git"
   },
+  "publishConfig": {
+    "registry": "http://192.168.1.206:11001/repository/npm-hosted/"
+  },
   "bugs": {
     "url": "https://github.com/koajs/joi-router/issues"
   },
