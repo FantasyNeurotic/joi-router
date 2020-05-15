@@ -234,15 +234,31 @@ function checkMethods(spec) {
 function checkValidators(spec) {
   if (!spec.validate) return;
 
-  let text;
-  if (spec.validate.body) {
-    text = 'validate.type must be declared when using validate.body';
-    assert(/json|form/.test(spec.validate.type), text);
-  }
+  assert(
+    spec.validate.type === undefined ||
+      typeof spec.validate.type === 'string' ||
+      Array.isArray(spec.validate.type),
+    'validate.type must be either a string or an array'
+  );
 
-  if (spec.validate.type) {
-    text = 'validate.type must be either json, form, multipart or stream';
-    assert(/json|form|multipart|stream/i.test(spec.validate.type), text);
+  spec.validate.type = !spec.validate.type
+    ? undefined
+    : [].concat(spec.validate.type);
+
+  if (spec.validate.body)
+    assert(
+      spec.validate.type &&
+        spec.validate.type.every(type => /json|form/i.test(type)),
+      'validate.type must be declared when using validate.body'
+    );
+
+  if (Array.isArray(spec.validate.type)) {
+    assert(
+      spec.validate.type.every(type =>
+        /json|form|multipart|stream/i.test(type)
+      ),
+      'validate.type must be either json, form, multipart or stream'
+    );
   }
 
   if (spec.validate.output) {
@@ -371,18 +387,23 @@ function makeMultipartParser(spec) {
 
 function makeBodyParser(spec) {
   if (!(spec.validate && spec.validate.type)) return noopMiddleware;
-
-  switch (spec.validate.type) {
-    case 'json':
-      return wrapError(spec, makeJSONBodyParser(spec));
-    case 'form':
-      return wrapError(spec, makeFormBodyParser(spec));
-    case 'stream':
-    case 'multipart':
-      return wrapError(spec, makeMultipartParser(spec));
-    default:
-      throw new Error(`unsupported body type: ${spec.validate.type}`);
+  let type = spec.validate.type
+  if (typeof type === 'string') {
+    type = [type]
   }
+  type = spec.validate.type.find(type => {
+    switch (type) {
+      case 'json':
+        return wrapError(spec, makeJSONBodyParser(spec));
+      case 'form':
+        return wrapError(spec, makeFormBodyParser(spec));
+      case 'stream':
+      case 'multipart':
+        return wrapError(spec, makeMultipartParser(spec));
+      default:
+        throw new Error(`unsupported body type: ${spec.validate.type}`);
+    }
+  })
 }
 
 /**
