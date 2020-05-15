@@ -54,6 +54,51 @@ Router.prototype.middleware = function middleware() {
   return this.router.routes();
 };
 
+Router.prototype.assemble = function () {
+  const router = this.router;
+    const middleware = Array.prototype.slice.call(arguments);
+    let path;
+
+    // support array of paths
+    if (Array.isArray(middleware[0]) && typeof middleware[0][0] === 'string') {
+      middleware[0].forEach(function (p) {
+        router.use.apply(router, [p].concat(middleware.slice(1)));
+      });
+
+      return this;
+    }
+
+    var hasPath = typeof middleware[0] === 'string';
+    if (hasPath) {
+      path = middleware.shift();
+    }
+
+    middleware.forEach(function (m) {
+      if (m.router) {
+        m.router.stack.forEach(function (nestedLayer) {
+          nestedLayer.joiRouter = Object.assign({}, m.routes.find((item) => {
+            return nestedLayer.methods.includes(item.method[0].toUpperCase()) && item.path === nestedLayer.path
+          }), { group: path, groupDescription: m.description})
+          if (path) nestedLayer.setPrefix(path);
+          if (router.opts.prefix) nestedLayer.setPrefix(router.opts.prefix);
+
+          router.stack.push(nestedLayer);
+        });
+
+        if (router.params) {
+          Object.keys(router.params).forEach(function (key) {
+            m.router.param(key, router.params[key]);
+          });
+        }
+      } else {
+        router.register(path || '(.*)', [], m, { end: false, ignoreCaptures: !hasPath });
+      }
+    });
+
+    return this.router;
+
+}
+
 /**
  * Adds a route or array of routes to this router, storing the route
  * in `this.routes`.
