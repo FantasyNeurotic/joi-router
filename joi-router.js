@@ -14,19 +14,17 @@ const delegate = require('delegates');
 const clone = require('clone');
 const OutputValidator = require('./output-validator');
 
-module.exports = Router;
-
-// expose Joi for use in applications
-Router.Joi = Joi;
-
 function Router() {
   if (!(this instanceof Router)) {
     return new Router();
   }
-
   this.routes = [];
+  this.strategy = [];
   this.router = new KoaRouter();
 }
+
+
+
 
 /**
  * Array of routes
@@ -53,9 +51,13 @@ delegate(Router.prototype, 'router')
 Router.prototype.middleware = function middleware() {
   return this.router.routes();
 };
+Router.prototype.setStrategy =  function(strategy) {
+  this.strategy  = strategy
+};
 
 Router.prototype.assemble = function () {
   const router = this.router;
+  const strategy = this.strategy
     const middleware = Array.prototype.slice.call(arguments);
     let path;
 
@@ -81,7 +83,8 @@ Router.prototype.assemble = function () {
           }), { group: path, groupDescription: m.description})
           if (path) nestedLayer.setPrefix(path);
           if (router.opts.prefix) nestedLayer.setPrefix(router.opts.prefix);
-
+          nestedLayer.joiRouter && (nestedLayer.joiRouter.strategy !==false) && nestedLayer.stack.splice(4,0, strategy)
+          nestedLayer.stack = flatten(nestedLayer.stack)
           router.stack.push(nestedLayer);
         });
 
@@ -91,7 +94,7 @@ Router.prototype.assemble = function () {
           });
         }
       } else {
-        router.register(path || '(.*)', [], m, { end: false, ignoreCaptures: !hasPath });
+        router.register(path || '(.*)', strategy, m, { end: false, ignoreCaptures: !hasPath });
       }
     });
 
@@ -163,7 +166,14 @@ Router.prototype._addRoute = function addRoute(spec) {
   const specExposer = makeSpecExposer(spec);
   const validator = makeValidator(spec);
   const preHandlers = spec.pre ? flatten(spec.pre) : [];
-  const handlers = flatten(spec.handler);
+  let allhandlers = []
+
+  if (!spec.strategy) {
+    allhandlers = allhandlers.concat(this.strategy, spec.handler)
+  } else {
+    allhandlers = spec.handler
+  }
+  const handlers = flatten(allhandlers);
 
   const args = [
     spec.path
@@ -204,6 +214,7 @@ Router.prototype._validateRouteSpec = function validateRouteSpec(spec) {
  */
 
 function checkHandler(spec) {
+
   if (!Array.isArray(spec.handler)) {
     spec.handler = [spec.handler];
   }
@@ -631,3 +642,7 @@ methods.forEach((method) => {
     return this;
   };
 });
+
+// expose Joi for use in applications
+Router.Joi = Joi;
+module.exports = Router;
